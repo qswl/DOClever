@@ -3,6 +3,7 @@
  */
 var path = require('path')
 var webpack = require('webpack');
+//var BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
 module.exports = {
     entry: {
         vendor:["vue","vuex","./web/common/common","./web/util/net","./web/util/local"],
@@ -18,7 +19,10 @@ module.exports = {
         donate:"./web/donate/donate",
         share:"./web/share/share",
         team:"./web/team/team",
-        registerqq:"./web/register/registerqq"
+        registerqq:"./web/register/registerqq",
+        admin:"./web/admin/admin",
+        adminlogin:"./web/admin/adminlogin",
+        custom:"./web/custom/custom",
     },
     output: {
         path: path.join(__dirname, 'dist'),
@@ -46,7 +50,8 @@ module.exports = {
                 comments: false,  // remove all comments
             }
         }),
-        new webpack.optimize.CommonsChunkPlugin({ name: 'vendor', filename: 'vendor.bundle.js' }),
+        new webpack.optimize.CommonsChunkPlugin({ name: 'vendor', filename: '[name].bundle.js'}),
+        //new BundleAnalyzerPlugin()
     ],
     module: {
         loaders: [
@@ -57,7 +62,7 @@ module.exports = {
             },
             {
                 test: /\.vue$/,
-                loader:"vue-loader",
+                loader:"vue-loader?cacheDirectory",
                 include: path.resolve(__dirname, 'web')
             },
             {
@@ -77,7 +82,7 @@ module.exports = {
             }
          ]
     },
-    //devtool: 'cheap-eval-source-map',
+    //devtool: 'cheap-module-eval-source-map',
     devtool: 'source-map',
     resolve: {
         modules: [path.resolve(__dirname, 'node_modules')],
