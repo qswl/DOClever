@@ -26,6 +26,10 @@ var interface=[
             team:{
                 optional:1,
                 type:String
+            },
+            public:{
+                type:Number,
+                optional:1
             }
         },
         "data":String,
@@ -183,6 +187,10 @@ var interface=[
             },
             group:{            //group存在获取group下的接口，不存在获取未分组的接口
                 type:String,
+                optional:1
+            },
+            sort:{
+                type:Number,   //不存在或者为0 名称  1 修改时间 2 自定义
                 optional:1
             }
         },
@@ -467,6 +475,46 @@ var interface=[
         user:1,
         handle:[project.importSwagger]
     },
+    {
+        "method":"PUT",
+        "path":"/project/updateswagger",
+        "param": {
+            id:String,
+            json:{
+                type:String,
+                optional:1
+            },
+            url:{
+                type:String,
+                optional:1
+            }
+        },
+        "data":{
+
+        },
+        user:1,
+        handle:[project.validateUser,project.updateSwagger]
+    },
+    {
+        "method":"POST",
+        "path":"/project/importpostman",
+        "param": {
+            json:{
+                type:String
+            },
+            team:{
+                type:String,
+                optional:1
+            },
+            baseurl:String,
+            ignore:Number
+        },
+        "data":{
+
+        },
+        user:1,
+        handle:[project.importPostman]
+    }
 ];
 
 module.exports=interface;

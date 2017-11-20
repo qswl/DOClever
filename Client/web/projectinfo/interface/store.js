@@ -492,7 +492,7 @@ module.exports={
                 state.param[index].name=objInter.name;
                 state.param[index].id=objInter.id;
                 state.param[index].remark=objInter.remark;
-                if(objInter.queryParam.length>0)
+                if(objInter.queryParam && objInter.queryParam.length>0)
                 {
                     state.param[index].query=objInter.queryParam;
                     state.param[index].query.forEach(function (item) {
@@ -549,7 +549,7 @@ module.exports={
                 {
                     objInter.bodyParam=state.param[index].body;
                 }
-                if(objInter.header.length>0)
+                if(objInter.header && objInter.header.length>0)
                 {
                     state.param[index].header=objInter.header;
                     state.param[index].header.push({
@@ -562,7 +562,7 @@ module.exports={
                 {
                     objInter.header=state.param[index].header;
                 }
-                if(objInter.outParam.length>0)
+                if(objInter.outParam && objInter.outParam.length>0)
                 {
                     helper.initResultShow(objInter.outParam);
                     state.param[index].result=objInter.outParam;
@@ -571,7 +571,7 @@ module.exports={
                 {
                     objInter.outParam=state.param[index].result;
                 }
-                if(objInter.restParam.length>0)
+                if(objInter.restParam && objInter.restParam.length>0)
                 {
                     state.param[index].param=objInter.restParam;
                     state.param[index].param.forEach(function (item) {
@@ -633,7 +633,7 @@ module.exports={
                     for(var i=0;i<state.param[index].header.length;i++)
                     {
                         var obj=state.param[index].header[i];
-                        if(obj.name.toLowerCase()=="content-type" && obj.value.toLowerCase()=="application/json")
+                        if(obj.name.toLowerCase()=="content-type" && obj.value.toLowerCase().indexOf("application/json")>-1)
                         {
                             bFind=true;
                             break;
@@ -942,7 +942,7 @@ module.exports={
             if(val)
             {
                 var arrParam=[];
-                var arr=val.match(/\{([^\s]+?)\}/g);
+                var arr=val.match(/\{([^\s|\}|\{]+?)\}(?!\})/g);
                 if(arr)
                 {
                     for(var i=0;i<arr.length;i++)
@@ -1006,11 +1006,11 @@ module.exports={
                         var str;
                         if(state.searchType==0)
                         {
-                            str=obj.name;
+                            str=obj.name?obj.name:"";
                         }
                         else
                         {
-                            str=obj.url;
+                            str=obj.url?obj.url:"";
                         }
                         if(str.toLowerCase().indexOf(state.searchText.toLowerCase())>-1)
                         {
@@ -1144,7 +1144,8 @@ module.exports={
             session.remove("snapshotCreator");
             session.remove("snapshotDate");
             return net.get("/project/interface",{
-                id:session.get("projectId")
+                id:session.get("projectId"),
+                sort:session.get("sort")?session.get("sort"):0
             }).then(function (data) {
                 if(data.code==200)
                 {
@@ -1225,7 +1226,8 @@ module.exports={
                     if(data.data.change)
                     {
                         return net.get("/project/interface",{
-                            id:session.get("projectId")
+                            id:session.get("projectId"),
+                            sort:session.get("sort")?session.get("sort"):0
                         }).then(function (data) {
                             if(data.code==200)
                             {
@@ -1336,105 +1338,70 @@ module.exports={
             context.getters.event.$emit("initInterface");
         },
         move:function (context,obj) {
+            var pro;
             if(obj.obj.folder)
             {
-                return net.put("/group/move",{
+                pro=net.put("/group/move",{
                     group:obj.obj.id,
-                    to:obj.top?"":obj.group._id
-                }).then(function (data) {
-                    if(data.code==200)
-                    {
-                        if(!obj.obj.group)
-                        {
-                            var objSplice=context.state.interfaceList[obj.obj.index];
-                            objSplice.parent=obj.group.id;
-                            context.state.interfaceList.splice(obj.obj.index,1);
-                            obj.group.data.unshift(objSplice);
-                            obj.group.show=1;
-                        }
-                        else
-                        {
-                            obj.group.show=1;
-                            (function (list) {
-                                for(var i=0;i<list.length;i++)
-                                {
-                                    var o=list[i];
-                                    if(o.data)
-                                    {
-                                        if(o._id==obj.obj.group)
-                                        {
-                                            var objSplice=o.data[obj.obj.index];
-                                            objSplice.parent=obj.group.id;
-                                            o.data.splice(obj.obj.index,1);
-                                            if(obj.top)
-                                            {
-                                                context.state.interfaceList.push(objSplice);
-                                            }
-                                            else
-                                            {
-                                                obj.group.data.unshift(objSplice);
-                                            }
-                                            return true;
-                                        }
-                                        else
-                                        {
-                                            var ret=arguments.callee(o.data);
-                                            if(ret)
-                                            {
-                                                return true;
-                                            }
-                                        }
-                                    }
-                                }
-                                return false;
-                            })(context.state.interfaceList);
-                        }
-                    }
-                    return data;
+                    to:obj.top?"":(obj.group?obj.group._id:""),
+                    index:obj.index
                 })
             }
             else
             {
-                return net.put("/interface/move",{
+                pro=net.put("/interface/move",{
                     id:obj.obj.id,
-                    group:obj.group._id
-                }).then(function (data) {
-                    if(data.code==200)
-                    {
-                        obj.group.show=1;
-                        (function (list) {
-                            for(var i=0;i<list.length;i++)
+                    group:obj.group._id,
+                    index:obj.index
+                })
+            }
+            return pro.then(function (data) {
+                if(data.code==200)
+                {
+                    context.commit("initInterfaceList",data.data);
+                    (function (list,objGroup) {
+                        for(var i=0;i<list.length;i++)
+                        {
+                            var o=list[i];
+                            if(o.data)
                             {
-                                var o=list[i];
-                                if(o.data)
+                                if(o._id==obj.obj.id)
                                 {
-                                    if(o._id==obj.obj.group)
+                                    if(objGroup)
                                     {
-                                        var objSplice=o.data[obj.obj.index];
-                                        if(objSplice.select)
-                                        {
-                                            context.commit("moveInterface",obj.group._id);
-                                        }
-                                        o.data.splice(obj.obj.index,1);
-                                        obj.group.data.push(objSplice);
-                                        return true;
+                                        objGroup.show=1;
                                     }
-                                    else
+                                    return true;
+                                }
+                                else
+                                {
+                                    var ret=arguments.callee(o.data,o);
+                                    if(ret)
                                     {
-                                        var ret=arguments.callee(o.data);
-                                        if(ret)
-                                        {
-                                            return true;
-                                        }
+                                        return true;
                                     }
                                 }
                             }
-                            return false;
-                        })(context.state.interfaceList);
-                    }
-                    return data;
-                })
-            }
+                            else
+                            {
+                                if(o._id==obj.obj.id)
+                                {
+                                    objGroup.show=1;
+                                    if(obj.obj.select)
+                                    {
+                                        o.select=1;
+                                        context.commit("setInterface",o);
+                                        context.commit("moveInterface",obj.group._id);
+                                    }
+                                    return true;
+                                }
+                            }
+                        }
+                        return false;
+                    })(context.state.interfaceList);
+                }
+                return data;
+            })
         },
         addGroup:function (context,query) {
             return net.post("/group/create",query.query,{
@@ -1686,6 +1653,28 @@ module.exports={
                 });
                 context.state.newInterfaceStr="";
             }
+        },
+        mergeGroup:function (context,id) {
+            return net.put("/group/merge",{
+                group:id
+            }).then(function (data) {
+                if(data.code==200)
+                {
+                    context.dispatch("refreshData",data.data);
+                }
+                return data;
+            })
+        },
+        mergeInterface:function (context,id) {
+            return net.put("/interface/merge",{
+                id:id
+            }).then(function (data) {
+                if(data.code==200)
+                {
+                    context.dispatch("refreshData",data.data);
+                }
+                return data;
+            })
         }
     }
 }

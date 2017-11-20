@@ -19,6 +19,63 @@ var fs=require("fs");
 var uuid=require("uuid/v1");
 
 function Group() {
+    this.sort=async (function (req,objGroup,objMove,index,bGroup) {
+        let arr;
+        if(bGroup)
+        {
+            let query={
+                project:req.obj._id
+            };
+            if(objGroup)
+            {
+                query.parent=objGroup.id;
+            }
+            else
+            {
+                query.parent={
+                    $exists:false
+                }
+            }
+            if(req.headers["docleverversion"])
+            {
+                query.version=req.headers["docleverversion"]
+            }
+            arr=await (req.groupModel.findAsync(query,null,{
+                sort:"sort"
+            }))
+        }
+        else
+        {
+            let query={
+                project:req.obj._id,
+                group:objGroup._id
+            };
+            if(req.headers["docleverversion"])
+            {
+                query.version=req.headers["docleverversion"]
+            }
+            arr=await (req.interfaceModel.findAsync(query,null,{
+                sort:"sort"
+            }))
+
+        }
+        for(let i=0;i<arr.length;i++)
+        {
+            let obj=arr[i];
+            if(obj._id.toString()==objMove._id.toString())
+            {
+                arr.splice(i,1);
+                break;
+            }
+        }
+        arr.splice(index,0,objMove);
+        for(let i=0;i<arr.length;i++)
+        {
+            let obj=arr[i];
+            obj.sort=i;
+            await (obj.saveAsync());
+        }
+    })
     this.getChild=async (function(req,id,obj,bInter) {
         let query={
             project:id,
@@ -30,8 +87,17 @@ function Group() {
         {
             query.version=req.headers["docleverversion"]
         }
+        let sort="name";
+        if(req.cookies.sort==1)
+        {
+            sort="-updatedAt";
+        }
+        else if(req.cookies.sort==2)
+        {
+            sort="sort";
+        }
         let arr=await (req.groupModel.findAsync(query,null,{
-            sort:"name"
+            sort:sort
         }))
         for(let obj of arr)
         {
@@ -41,8 +107,8 @@ function Group() {
         {
             let arrInterface=await (req.interfaceModel.findAsync({
                 group:obj._id
-            },"_id name method finish url",{
-                sort:"name"
+            },"_id name method finish url delete",{
+                sort:sort
             }));
             arr=arr.concat(arrInterface);
         }
@@ -115,13 +181,13 @@ function Group() {
                             }
                         }
                     }))
-                    if(arrUser.length==0)
+                    if(arrUser.length==0 && !obj.public)
                     {
                         util.throw(e.userForbidden,"你没有权限");
                         return;
                     }
                 }
-                else
+                else if(!obj.public)
                 {
                     util.throw(e.userForbidden,"你没有权限");
                     return;
@@ -290,12 +356,13 @@ function Group() {
                 {
                     query.version=req.headers["docleverversion"]
                 }
-                let arr=await (req.groupModel.findAsync(query,"-_id -parent -version -project",{
+                let arr=await (req.groupModel.findAsync(query,"-parent -version -project",{
                     sort:"name"
                 }))
                 for(let obj of arr)
                 {
                     obj._doc.data=await (_map(req,id,obj));
+                    delete obj._doc._id;
                 }
                 let arrInterface=await (req.interfaceModel.findAsync({
                     group:obj._id
@@ -452,7 +519,7 @@ function Group() {
                     util.throw(e.groupNotFound,"分组不存在");
                 }
             }
-            await (req.groupModel.updateAsync({
+            let obj=await (req.groupModel.findOneAndUpdateAsync({
                 _id:req.clientParam.group
             },req.clientParam.to?{
                 parent:toGroup.id
@@ -460,8 +527,62 @@ function Group() {
                 $unset:{
                     parent:1
                 }
+            },{
+                new:true
             }));
-            util.ok(res,"ok");
+            await (this.sort(req,toGroup,obj,req.clientParam.index?req.clientParam.index:0,1))
+            let arr = await(this.getChild(req,obj.project, null,1))
+            util.ok(res,arr,"ok");
+        }
+        catch (err)
+        {
+            util.catch(res,err);
+        }
+    })
+    this.merge=async ((req,res)=>{
+        try
+        {
+            await (req.groupModel.updateAsync({
+                _id:req.clientParam.group
+            },{
+                $unset:{
+                    delete:1
+                }
+            }))
+            let mergeChild=async (function(obj) {
+                let query={
+                    project:req.obj._id,
+                    parent:obj.id
+                }
+                if(req.headers["docleverversion"])
+                {
+                    query.version=req.headers["docleverversion"]
+                }
+                let arr=await (req.groupModel.findAsync(query))
+                for(let obj of arr)
+                {
+                    await (req.groupModel.findOneAndUpdateAsync({
+                        _id:obj._id
+                    },{
+                        $unset:{
+                            delete:1
+                        }
+                    }))
+                    await (mergeChild(obj));
+                }
+                await (req.interfaceModel.updateAsync({
+                    group:obj._id
+                },{
+                    $unset:{
+                        delete:1
+                    }
+                },{
+                    multi:true
+                }));
+            })
+            await (mergeChild(req.group));
+            let arr = await (this.getChild(req,req.group.project,null,1));
+            util.ok(res, arr, "ok");
         }
         catch (err)
         {

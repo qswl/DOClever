@@ -33,7 +33,12 @@ var model=new mongoose.Schema({
     },
     before:Object,
     after:Object,
-    id:String
+    id:String,
+    delete:Number,
+    sort:{
+        type:Number,
+        default:0
+    }
 },{
     timestamps:true,
     strict: false

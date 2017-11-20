@@ -19,6 +19,63 @@ var fs=require("fs");
 var uuid=require("uuid/v1");
 
 function Interface() {
+    this.sort=async (function (req,objGroup,objMove,index,bGroup) {
+        let arr;
+        if(bGroup)
+        {
+            let query={
+                project:req.project._id
+            };
+            if(objGroup)
+            {
+                query.parent=objGroup.id;
+            }
+            else
+            {
+                query.parent={
+                    $exists:false
+                }
+            }
+            if(req.headers["docleverversion"])
+            {
+                query.version=req.headers["docleverversion"]
+            }
+            arr=await (req.groupModel.findAsync(query,null,{
+                sort:"sort"
+            }))
+        }
+        else
+        {
+            let query={
+                project:req.project._id,
+                group:objGroup._id
+            };
+            if(req.headers["docleverversion"])
+            {
+                query.version=req.headers["docleverversion"]
+            }
+            arr=await (req.interfaceModel.findAsync(query,null,{
+                sort:"sort"
+            }))
+
+        }
+        for(let i=0;i<arr.length;i++)
+        {
+            let obj=arr[i];
+            if(obj._id.toString()==objMove._id.toString())
+            {
+                arr.splice(i,1);
+                break;
+            }
+        }
+        arr.splice(index,0,objMove);
+        for(let i=0;i<arr.length;i++)
+        {
+            let obj=arr[i];
+            obj.sort=i;
+            await (obj.saveAsync());
+        }
+    })
     this.getChild=async (function(req,id,obj,bInter) {
         let query={
             project:id,
@@ -30,8 +87,17 @@ function Interface() {
         {
             query.version=req.headers["docleverversion"]
         }
+        let sort="name";
+        if(req.cookies.sort==1)
+        {
+            sort="-updatedAt";
+        }
+        else if(req.cookies.sort==2)
+        {
+            sort="sort";
+        }
         let arr=await (req.groupModel.findAsync(query,null,{
-            sort:"name"
+            sort:sort
         }))
         for(let obj of arr)
         {
@@ -41,8 +107,8 @@ function Interface() {
         {
             let arrInterface=await (req.interfaceModel.findAsync({
                 group:obj._id
-            },"_id name method finish url",{
-                sort:"name"
+            },"_id name method finish url delete",{
+                sort:sort
             }));
             arr=arr.concat(arrInterface);
         }
@@ -113,12 +179,13 @@ function Interface() {
                             }
                         }
                     }))
-                    if (arrUser.length == 0) {
+                    if (arrUser.length == 0 && !obj.public) {
                         util.throw(e.userForbidden, "你没有权限");
                         return;
                     }
                 }
-                else {
+                else if(!obj.public)
+                {
                     util.throw(e.userForbidden, "你没有权限");
                     return;
                 }
@@ -150,6 +217,13 @@ function Interface() {
             }
             else {
                 req.group = g;
+                if(req.clientParam.project)
+                {
+                    if(req.group.project.toString()!=req.clientParam.project)
+                    {
+                        util.throw(e.systemReason, "分组不在当前工程内")
+                    }
+                }
             }
         }
     })
@@ -157,6 +231,26 @@ function Interface() {
     this.create=async ((req, res)=> {
         try {
             await(this.validateUser(req));
+            let query={
+                url:req.clientParam.url,
+                method:req.clientParam.method,
+                project:req.project._id
+            }
+            if(req.clientParam.id)
+            {
+                query._id={
+                    $ne:req.clientParam.id
+                }
+            }
+            if (req.headers["docleverversion"]) {
+                query.version = req.headers["docleverversion"]
+            }
+            let bDuplicate=false;
+            let obj=await (req.interfaceModel.findOneAsync(query));
+            if(obj)
+            {
+                bDuplicate=true;
+            }
             let update = {};
             for (let key in req.clientParam) {
                 if (key != "id" && req.clientParam[key] !== undefined) {
@@ -205,7 +299,7 @@ function Interface() {
                         return;
                     }
                 }
-                util.ok(res, obj._id, "修改成功");
+                util.ok(res, obj._id, bDuplicate?"有重复接口，请尽量避免":"修改成功");
             }
             else
             {
@@ -216,7 +310,7 @@ function Interface() {
                     update.version = req.headers["docleverversion"]
                 }
                 let obj = await(req.interfaceModel.createAsync(update))
-                util.ok(res, obj, "新建成功");
+                util.ok(res, obj, bDuplicate?"有重复接口，请尽量避免":"新建成功");
             }
         }
         catch (err) {
@@ -268,9 +362,11 @@ function Interface() {
             }
             let update = {};
             update.group = req.group._id;
-            await(req.interfaceModel.updateAsync({
+            let obj=await(req.interfaceModel.findOneAndUpdateAsync({
                 _id: req.clientParam.id
-            }, update))
+            }, update,{
+                new:true
+            }))
             let query = {
                 id: req.interface.id,
                 project: req.project._id
@@ -284,7 +380,9 @@ function Interface() {
                 }
             }
             await(interfaceSnapshot.updateAsync(query, update));
-            util.ok(res, "移动成功");
+            await (this.sort(req,req.group,obj,req.clientParam.index?req.clientParam.index:0))
+            let arr = await(this.getChild(req,obj.project, null,1))
+            util.ok(res,arr,"移动成功");
         }
         catch (err) {
             util.catch(res, err);
@@ -593,6 +691,77 @@ function Interface() {
         }
         catch (err) {
             util.catch(res, err);
+        }
+    })
+    this.notify=async ((req,res)=>{
+        try
+        {
+            await (this.validateUser(req));
+            if(!req.userInfo.sendInfo.user)
+            {
+                util.throw(e.systemReason,"发件账户不存在，请前去个人设置里面设置");
+            }
+            let arrTo=req.clientParam.users.split(",");
+            let arrToMail=[];
+            for(let obj of arrTo)
+            {
+                let u=await (user.findOneAsync({
+                    _id:obj
+                }))
+                if(u && u.email)
+                {
+                    arrToMail.push(u.email);
+                }
+            }
+            let title=`[DOClever]接口${req.interface.name}发生变更`;
+            req.group=await (req.groupModel.findOneAsync({
+                _id:req.interface.group
+            }));
+            let g=req.group.id;
+            let arrGroup=[];
+            while(g)
+            {
+                let obj=await (req.groupModel.findOneAsync({
+                    id:g,
+                    project:req.interface.project
+                }));
+                if(obj)
+                {
+                    arrGroup.unshift(obj.name);
+                }
+                g=obj.parent;
+            }
+            let strGroup=arrGroup.join("/");
+            let content=`<div>名称：${req.interface.name}</div><div>路径：${req.interface.url}</div><div>方法：${req.interface.method}</div><div>分组：${strGroup}</div><div>通知人：${req.userInfo.name}</div><div>通知内容：${req.clientParam.content?req.clientParam.content:""}</div>`;
+            if(arrToMail.length>0)
+            {
+                util.sendMail(req.userInfo.sendInfo.smtp,req.userInfo.sendInfo.port,req.userInfo.sendInfo.user,req.userInfo.sendInfo.password,arrToMail,title,content);
+            }
+            util.ok(res,"ok");
+        }
+        catch (err)
+        {
+            util.catch(res,err);
+        }
+    })
+    this.merge=async ((req,res)=>{
+        try
+        {
+            await (this.validateUser(req));
+            await (req.interfaceModel.updateAsync({
+                _id:req.clientParam.id
+            },{
+                $unset:{
+                    delete:1
+                }
+            }))
+            let arr = await(this.getChild(req,req.project._id, null,1));
+            util.ok(res, arr, "ok");
+
+        }
+        catch (err)
+        {
+            util.catch(res,err);
         }
     })
 }

@@ -35,7 +35,10 @@ var interface=[
             url:{
                 type:String,
             },
-            test:String
+            test:String,
+            immediate:Number,
+            phoneinfo:String,
+            failsend:Number
         },
         "data":String,
         user:1,

@@ -5,12 +5,24 @@
                 <el-col class="col" :span="6" style="line-height: 50px;text-align: center;font-weight: bold;font-size: 15px;padding: 0">
                     分组
                 </el-col>
-                <el-col class="col" :span="interfaceEditRole?9:15"></el-col>
+                <el-col class="col" :span="interfaceEditRole?6:12"></el-col>
                 <el-col class="col" :span="3" style="cursor: pointer;text-align: center;line-height: 50px;" title="导入分组" v-if="interfaceEditRole" @click.native="importGroup">
                     <i class="fa fa-download"></i>
                 </el-col>
                 <el-col class="col" :span="3" style="cursor: pointer;text-align: center;line-height: 50px;" title="添加分组" v-if="interfaceEditRole" @click.native="addGroup">
                     <i class="el-icon-plus"></i>
+                </el-col>
+                <el-col class="col" :span="3" style="cursor: pointer;text-align: center;line-height: 50px;" title="排序">
+                    <el-dropdown trigger="hover" style="width: 100%;height: 100%;cursor: pointer">
+                        <div class="el-dropdown-link">
+                            <i class="fa fa-sort-amount-desc" style="color: white"></i>
+                        </div>
+                        <el-dropdown-menu slot="dropdown">
+                            <el-dropdown-item><div @click="sortType=0"><i class="el-icon-check" style="color: #11b95c" v-if="sortType==0"></i>&nbsp;名称</div></el-dropdown-item>
+                            <el-dropdown-item><div @click="sortType=1"><i class="el-icon-check" style="color: #11b95c" v-if="sortType==1"></i>&nbsp;修改时间</div></el-dropdown-item>
+                            <el-dropdown-item><el-tooltip class="item" effect="dark" content="自定义排序下可以拖动接口或分组来排序" placement="right"><div @click="sortType=2"><i class="el-icon-check" style="color: #11b95c" v-if="sortType==2"></i>&nbsp;自定义</div></el-tooltip></el-dropdown-item>
+                        </el-dropdown-menu>
+                    </el-dropdown>
                 </el-col>
                 <el-col class="col" :span="3" style="cursor: pointer;text-align: center;line-height: 50px;" title="搜索" @click.native="search=true">
                     <i class="el-icon-search"></i>
@@ -52,9 +64,14 @@
                         <el-col class="col" :span="1" style="text-align: left">
                         </el-col>
                         <el-col class="col" :span="3" style="height: 50px;line-height: 50px;text-align: left" id="editSave">
-                            <el-button :loading="savePending" type="primary" style="width: 65%" @click="save" v-if="interfaceEditRole">
+                            <el-button :loading="savePending" type="primary" style="width: 65%" @click="save" v-if="interfaceEditRole" id="btnSave">
                                 保存
                             </el-button>
+                            <transition name="el-fade-in-linear">
+                                <el-button id="mail" v-show="mailShow" type="text" style="position: absolute" @click="sendMail">
+                                    <i class="fa fa-envelope-o"></i>
+                                </el-button>
+                            </transition>
                         </el-col>
                         <el-col class="col" :span="3" style="height: 50px;line-height: 50px;text-align: left" id="editRun">
                             <el-button type="primary" style="width: 65%" @click="run">
@@ -112,7 +129,11 @@
                             分享
                         </el-col>
                         <el-col class="col" :span="22" style="text-align: left">
-                            <el-input style="width: 95%" v-model="shareUrl" disabled></el-input>
+                            <el-input style="width: 95%" v-model="shareUrl" id="shareUrl" disabled>
+                                <template slot="append">
+                                    <el-button type="primary" style="font-size: 14px;width: 60px;color: #20a0ff" @click="copyClipboard">复制</el-button>
+                                </template>
+                            </el-input>
                         </el-col>
                     </el-row>
                     <el-row class="row" style="height: 90px;line-height: 90px;text-align: center">
@@ -226,6 +247,8 @@
               savePending:false,
               snapshot:{},
               bMax:false,
+              mailShow:false,
+              sortType:session.get("sort")?session.get("sort"):0
           }
         },
         mixins:[sessionChange],
@@ -237,6 +260,32 @@
             "interfacepreview":interfacePreview
         },
         watch:{
+            sortType:function (val) {
+                session.set("sort",val);
+                $.startHud("#body");
+                this.$store.dispatch("refresh").then(function (data) {
+                    $.stopHud();
+                    if(data.code!=200)
+                    {
+                        $.notify(data.msg,0);
+                    }
+                })
+            },
+            mailShow:function (val) {
+                if(val)
+                {
+                    var save=document.getElementById("btnSave");
+                    var mail=document.getElementById("mail");
+                    mail.style.left=save.offsetLeft+save.offsetWidth/4+"px";
+                    mail.style.top="-20px";
+                    mail.style.width=save.offsetWidth/2+"px";
+                    mail.style.marginLeft=0;
+                    var _this=this;
+                    setTimeout(function () {
+                        _this.mailShow=false;
+                    },2000);
+                }
+            },
             preview:function (val) {
                 store.dispatch("changePreview",val);
             },
@@ -453,7 +502,15 @@
                     _this.savePending=false;
                     if(data.code==200)
                     {
-                        $.notify("保存成功",1)
+                        if(data.msg.indexOf("成功")>-1)
+                        {
+                            $.notify("保存成功",1)
+                        }
+                        else
+                        {
+                            $.tip(data.msg,2)
+                        }
+                        _this.mailShow=true;
                     }
                     else
                     {
@@ -471,10 +528,10 @@
                 var _this=this;
                 var obj=$.clone(this.interfaceEdit);
                 obj.param=$.clone(this.param);
-                var child=$.showBox(this,"run",{
+                var child=$.showBox(this,require("./run/run.vue"),{
                     "interfaceEdit":obj,
                     "index":this.index
-                },"projectinfo/interface/run");
+                });
                 child.$on("save",function () {
                     store.dispatch("newInterface");
                 });
@@ -492,6 +549,10 @@
                     {
                         bMark=true;
                         _this.interfaceEdit.url=_this.interfaceEdit.url.substring(0,index);
+                    }
+                    else
+                    {
+                        return;
                     }
                     for(var i=0;i<_this.$store.state.param.length;i++)
                     {
@@ -636,10 +697,10 @@
                     $.stopHud();
                     if(data.code==200)
                     {
-                        var child=$.showBox(_this,"snapshotList",{
+                        var child=$.showBox(_this,require("./snapshotList.vue"),{
                             arr:data.data,
                             id:_this.interfaceEdit._id
-                        },"projectinfo/interface");
+                        });
 
                     }
                     else
@@ -790,11 +851,71 @@
             },
             cloneParam:function (item) {
                 this.$store.commit("addParam",1);
+            },
+            sendMail:function () {
+                var _this=this;
+                Promise.all([
+                    net.get("/project/users",{
+                        id:session.get("projectId")
+                    }),
+                    net.get("/user/sendinfo")
+                ]).then(function (data) {
+                    var obj1=data[0];
+                    var obj2=data[1];
+                    var user;
+                    if(obj1.code==200)
+                    {
+                        user=obj1.data.filter(function (obj) {
+                            if(obj._id==session.get("id"))
+                            {
+                                return false;
+                            }
+                            else
+                            {
+                                return true;
+                            }
+                        });
+                    }
+                    else
+                    {
+                        $.notify(obj1.msg,0);
+                        return;
+                    }
+                    if(obj2.code==200)
+                    {
+                        if(!obj2.data.user)
+                        {
+                            $.notify("发件账户不存在，请前去个人设置里面设置",0);
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        $.notify(obj2.msg,0);
+                        return;
+                    }
+                    $.showBox(_this,require("./sendMail.vue"),{
+                        source:user,
+                        id:_this.interfaceEdit._id
+                    })
+                })
+            },
+            copyClipboard:function () {
+                var ele=document.getElementById("shareUrl").getElementsByTagName("input")[0];
+                ele.disabled=false;
+                ele.select();
+                document.execCommand("Copy");
+                ele.disabled=true;
+                $.tip("已复制到剪贴板",1);
             }
         },
         created:function () {
+            var _this=this;
             store.getters.event.$on("initStatus",function (data) {
                 store.commit("setStatus",data);
+            })
+            store.getters.event.$on("initInterface",function (data) {
+                _this.mailShow=false;
             })
         },
     }

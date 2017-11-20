@@ -55,6 +55,9 @@ var interface=[
             },
             answer:{
                 type:String
+            },
+            email:{
+                type:String
             }
         },
         "data":{
@@ -97,6 +100,10 @@ var interface=[
                 type:String
             },
             photo:{
+                optional:1,
+                type:String
+            },
+            phone:{
                 optional:1,
                 type:String
             },
@@ -213,6 +220,41 @@ var interface=[
         },
         user:1,
         handle:user.handleApply
+    },
+    {
+        "method":"PUT",
+        "path":"/user/sendinfo",
+        "param": {
+            user:{
+                type:String
+            },
+            password:{
+                type:String
+            },
+            smtp:{
+                type:String
+            },
+            port:{
+                type:Number
+            }
+        },
+        "data":{
+
+        },
+        user:1,
+        handle:user.setSendInfo
+    },
+    {
+        "method":"GET",
+        "path":"/user/sendinfo",
+        "param": {
+
+        },
+        "data":{
+
+        },
+        user:1,
+        handle:user.getSendInfo
     },
 ];
 

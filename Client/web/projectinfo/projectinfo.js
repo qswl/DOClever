@@ -2,7 +2,7 @@
  * Created by sunxin on 2016/12/22.
  */
 var mainNav=require("../component/mainNav.vue")
-var interface=require("./interface/interface.vue")
+var inter=require("./interface/interface.vue")
 var setting=require("./setting/setting.vue")
 var global=require("./global/global.vue")
 var test=require("./test/test.vue")
@@ -26,17 +26,53 @@ var vue=new Vue({
         type:0,
         arrApply:[],
         showApply:false,
-        selProject:session.get("projectName")
+        selProject:session.get("projectName"),
+        autoSave:0,
+        timerSave:null
     },
     store:store,
     mixins:[sessionChange],
     components:{
         "mainnav":mainNav,
-        "interface":interface,
+        "interface":inter,
         "setting":setting,
         "global":global,
         "test":test,
         "version":version
+    },
+    watch:{
+        autoSave:function (val) {
+            if(val==0)
+            {
+                if(this.timerSave)
+                {
+                    clearTimeout(this.timerSave);
+                    this.timerSave=null;
+                }
+            }
+            else
+            {
+                if(!this.timerSave)
+                {
+                    var _this=this;
+                    this.timerSave=setTimeout(function autoSave() {
+                        if(store.state.interface.interfaceEdit && store.state.interface.interfaceEdit._id)
+                        {
+                            store.dispatch("interface/save").then(function (data) {
+                                if(data.code==200)
+                                {
+                                    _this.timerSave=setTimeout(autoSave,5000);
+                                }
+                            })
+                        }
+                        else
+                        {
+                            _this.timerSave=setTimeout(autoSave,5000);
+                        }
+                    },5000);
+                }
+            }
+        }
     },
     methods:{
         handleApply:function (item,state) {
@@ -115,7 +151,8 @@ var vue=new Vue({
         var _this=this;
         Promise.all([
             net.get("/project/interface",{
-                id:session.get("projectId")
+                id:session.get("projectId"),
+                sort:session.get("sort")?session.get("sort"):0
             }),
             net.get("/project/info",{
                 id:session.get("projectId")

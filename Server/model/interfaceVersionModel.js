@@ -37,6 +37,11 @@ var model=new mongoose.Schema({
     version:{
         type:mongoose.Schema.ObjectId,
         ref:"Version"
+    },
+    delete:Number,
+    sort:{
+        type:Number,
+        default:0
     }
 },{
     timestamps:true,

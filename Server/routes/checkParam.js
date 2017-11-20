@@ -55,7 +55,7 @@ function route(category) {
                 });
                 return;
             }
-            else if (req.clientParam[key] && param[key].type == Number) {
+            else if (req.clientParam[key] && (param[key].type == Number || param[key]==Number)) {
                 if(isNaN(req.clientParam[key]))
                 {
                     res.json({
@@ -103,7 +103,7 @@ function route(category) {
             }
         }
         req.clientParam=temp;
-        if(inter[index].user)
+        if(inter[index].user || inter[index].admin)
         {
             req.handle=inter[index].handle
             next();

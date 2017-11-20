@@ -84,6 +84,10 @@ var interface=[
             },
             group:{
                 type:String
+            },
+            index:{
+                type:Number,
+                optional:1
             }
         },
         "data":String,
@@ -201,6 +205,37 @@ var interface=[
         "data":String,
         user:1,
         handle:inter.snapshotRoll
+    },
+    {
+        "method":"POST",
+        "path":"/interface/notify",
+        "param": {
+            id:{
+                type:String
+            },
+            users:{
+                type:String
+            },
+            content:{
+                type:String,
+                optional:1
+            }
+        },
+        "data":String,
+        user:1,
+        handle:inter.notify
+    },
+    {
+        "method":"PUT",
+        "path":"/interface/merge",
+        "param": {
+            id:{
+                type:String
+            }
+        },
+        "data":String,
+        user:1,
+        handle:inter.merge
     },
 ];
 

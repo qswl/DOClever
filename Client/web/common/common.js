@@ -187,13 +187,17 @@ $.confirm=function (title,funcOk,funcCancel) {
 }
 
 $.tip=function (content,bOk) {
-    if(bOk)
+    if(bOk==1)
     {
         Vue.prototype.$message.success(content);
     }
-    else
+    else if(bOk==0)
     {
         Vue.prototype.$message.error(content);
+    }
+    else if(bOk==2)
+    {
+        Vue.prototype.$message.warning(content);
     }
 }
 
@@ -331,8 +335,8 @@ $.stopHud=function () {
     }
 }
 
-$.getNowFormatDate=function(fmt) {
-    var date=new Date();
+$.getNowFormatDate=function(fmt,date) {
+    var date=date || new Date();
     var o = {
         "M+": date.getMonth() + 1, //月份
         "d+": date.getDate(), //日
@@ -348,12 +352,12 @@ $.getNowFormatDate=function(fmt) {
     return fmt;
 }
 
-$.showBox=function (vue,type,attr,path) {
+$.showBox=function (vue,obj,attr) {
     var ele=document.createElement("div");
     vue.$el.appendChild(ele);
     var self = vue;
     var module;
-    var Child = Vue.extend(path?require("../"+path+"/"+type+".vue"):require("../component/"+type+".vue"));
+    var Child = Vue.extend(obj);
     var child = new Child({
         el: ele,
         parent: self,

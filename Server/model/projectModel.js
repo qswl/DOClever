@@ -11,7 +11,7 @@ var model=new mongoose.Schema({
         default:""
     },
     baseUrls:{
-        type:mongoose.Schema.Types.Mixed,
+        type:mongoose.Schema.Types.Mixed,  //{remark,"",url:"",env:[{key,value,remark}]}
         default:[]
     },
     owner:{
@@ -41,6 +41,11 @@ var model=new mongoose.Schema({
     team:{
         type:mongoose.Schema.ObjectId,
         ref:"Team"
+    },
+    source:Object,     //{type:Number,url:String}   0,swagger,1,rap,2,postman
+    public:{
+        type:Number,
+        default:0
     }
 },{
     timestamps:true
